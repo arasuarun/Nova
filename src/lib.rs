@@ -170,6 +170,80 @@ where
     let _ = circuit_primary.synthesize(&mut cs);
     let (r1cs_shape_primary, ck_primary) = cs.r1cs_shape(ck_hint1);
 
+
+    // Initialize ck for the secondary
+    let circuit_secondary: NovaAugmentedCircuit<'_, E1, C2> = NovaAugmentedCircuit::new(
+      &augmented_circuit_params_secondary,
+      None,
+      c_secondary,
+      ro_consts_circuit_secondary.clone(),
+    );
+    let mut cs: ShapeCS<E2> = ShapeCS::new();
+    let _ = circuit_secondary.synthesize(&mut cs);
+    let (r1cs_shape_secondary, ck_secondary) = cs.r1cs_shape(ck_hint2);
+
+    PublicParams {
+      F_arity_primary,
+      F_arity_secondary,
+      ro_consts_primary,
+      ro_consts_circuit_primary,
+      ck_primary,
+      r1cs_shape_primary,
+      ro_consts_secondary,
+      ro_consts_circuit_secondary,
+      ck_secondary,
+      r1cs_shape_secondary,
+      augmented_circuit_params_primary,
+      augmented_circuit_params_secondary,
+      digest: OnceCell::new(),
+      _p: Default::default(),
+    }
+  }
+
+  /// Same as above but for a split witness 
+  pub fn setup_with_split(
+    c_primary: &C1,
+    c_secondary: &C2,
+    ck_hint1: &CommitmentKeyHint<E1>,
+    ck_hint2: &CommitmentKeyHint<E2>,
+    split_length: usize,
+  ) -> Self {
+    let augmented_circuit_params_primary =
+      NovaAugmentedCircuitParams::new(BN_LIMB_WIDTH, BN_N_LIMBS, true);
+    let augmented_circuit_params_secondary =
+      NovaAugmentedCircuitParams::new(BN_LIMB_WIDTH, BN_N_LIMBS, false);
+
+    let ro_consts_primary: ROConstants<E1> = ROConstants::<E1>::default();
+    let ro_consts_secondary: ROConstants<E2> = ROConstants::<E2>::default();
+
+    let F_arity_primary = c_primary.arity();
+    let F_arity_secondary = c_secondary.arity();
+
+    // ro_consts_circuit_primary are parameterized by E2 because the type alias uses E2::Base = E1::Scalar
+    let ro_consts_circuit_primary: ROConstantsCircuit<E2> = ROConstantsCircuit::<E2>::default();
+    let ro_consts_circuit_secondary: ROConstantsCircuit<E1> = ROConstantsCircuit::<E1>::default();
+
+    // Initialize ck for the primary
+    let circuit_primary: NovaAugmentedCircuit<'_, E2, C1> = NovaAugmentedCircuit::new(
+      &augmented_circuit_params_primary,
+      None,
+      c_primary,
+      ro_consts_circuit_primary.clone(),
+    );
+    let mut cs: ShapeCS<E1> = ShapeCS::new();
+    let _ = circuit_primary.synthesize(&mut cs);
+    let (r1cs_shape_primary_unsplit, ck_primary) = cs.r1cs_shape(ck_hint1);
+
+    let r1cs_shape_primary = R1CSShape {
+      num_cons: r1cs_shape_primary_unsplit.num_cons,
+      num_vars: (split_length, r1cs_shape_primary_unsplit.num_vars.1 - split_length),
+      num_io: r1cs_shape_primary_unsplit.num_io,
+      A: r1cs_shape_primary_unsplit.A,
+      B: r1cs_shape_primary_unsplit.B,
+      C: r1cs_shape_primary_unsplit.C,
+      digest: r1cs_shape_primary_unsplit.digest, 
+    };
+
     // Initialize ck for the secondary
     let circuit_secondary: NovaAugmentedCircuit<'_, E1, C2> = NovaAugmentedCircuit::new(
       &augmented_circuit_params_secondary,
@@ -219,8 +293,8 @@ where
   /// Returns the number of variables in the primary and secondary circuits
   pub const fn num_variables(&self) -> (usize, usize) {
     (
-      self.r1cs_shape_primary.num_vars,
-      self.r1cs_shape_secondary.num_vars,
+      self.r1cs_shape_primary.num_vars.0 + self.r1cs_shape_primary.num_vars.1,
+      self.r1cs_shape_secondary.num_vars.0 + self.r1cs_shape_secondary.num_vars.1,
     )
   }
 }

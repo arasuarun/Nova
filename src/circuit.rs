@@ -457,6 +457,10 @@ mod tests {
     test_recursive_circuit_with::<PallasEngine, VestaEngine>(
       &params1, &params2, ro_consts1, ro_consts2, 9825, 10357,
     );
+    // Arasu: 
+    // test_recursive_circuit_with::<PallasEngine, VestaEngine>(
+    //   &params1, &params2, ro_consts1, ro_consts2, 11831, 12363,
+    // );
   }
 
   #[test]

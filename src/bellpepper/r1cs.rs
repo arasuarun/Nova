@@ -36,7 +36,11 @@ impl<E: Engine> NovaWitness<E> for SatisfyingAssignment<E> {
     shape: &R1CSShape<E>,
     ck: &CommitmentKey<E>,
   ) -> Result<(R1CSInstance<E>, R1CSWitness<E>), NovaError> {
-    let W = R1CSWitness::<E>::new(shape, self.aux_assignment())?;
+    // let W = R1CSWitness::<E>::new(shape, self.aux_assignment())?;
+    // Arasu: I think this is how it should be 
+    let W = R1CSWitness::<E>::new(shape, 
+      self.aux_assignment().split_at(shape.num_vars.0)
+    )?;
     let X = &self.input_assignment()[1..];
 
     let comm_W = W.commit(ck);
@@ -80,7 +84,7 @@ macro_rules! impl_nova_shape {
         C.cols = num_vars + num_inputs;
 
         // Don't count One as an input for shape's purposes.
-        let S = R1CSShape::new(num_constraints, num_vars, num_inputs - 1, A, B, C).unwrap();
+        let S = R1CSShape::new(num_constraints, (0, num_vars), num_inputs - 1, A, B, C).unwrap();
         let ck = R1CS::<E>::commitment_key(&S, ck_hint);
 
         (S, ck)

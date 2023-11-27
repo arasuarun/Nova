@@ -36,7 +36,7 @@ pub struct R1CS<E: Engine> {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct R1CSShape<E: Engine> {
   pub(crate) num_cons: usize,
-  pub(crate) num_vars: usize,
+  pub(crate) num_vars: (usize, usize),
   pub(crate) num_io: usize,
   pub(crate) A: SparseMatrix<E::Scalar>,
   pub(crate) B: SparseMatrix<E::Scalar>,
@@ -50,21 +50,21 @@ impl<E: Engine> SimpleDigestible for R1CSShape<E> {}
 /// A type that holds a witness for a given R1CS instance
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct R1CSWitness<E: Engine> {
-  W: Vec<E::Scalar>,
+  W: (Vec<E::Scalar>, Vec<E::Scalar>),
 }
 
 /// A type that holds an R1CS instance
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct R1CSInstance<E: Engine> {
-  pub(crate) comm_W: Commitment<E>,
+  pub(crate) comm_W: (Commitment<E>, Commitment<E>),
   pub(crate) X: Vec<E::Scalar>,
 }
 
 /// A type that holds a witness for a given Relaxed R1CS instance
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RelaxedR1CSWitness<E: Engine> {
-  pub(crate) W: Vec<E::Scalar>,
+  pub(crate) W: (Vec<E::Scalar>, Vec<E::Scalar>),
   pub(crate) E: Vec<E::Scalar>,
 }
 
@@ -72,7 +72,7 @@ pub struct RelaxedR1CSWitness<E: Engine> {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(bound = "")]
 pub struct RelaxedR1CSInstance<E: Engine> {
-  pub(crate) comm_W: Commitment<E>,
+  pub(crate) comm_W: (Commitment<E>, Commitment<E>),
   pub(crate) comm_E: Commitment<E>,
   pub(crate) X: Vec<E::Scalar>,
   pub(crate) u: E::Scalar,
@@ -96,7 +96,7 @@ impl<E: Engine> R1CS<E> {
     let num_cons = S.num_cons;
     let num_vars = S.num_vars;
     let ck_hint = ck_floor(S);
-    E::CE::setup(b"ck", max(max(num_cons, num_vars), ck_hint))
+    E::CE::setup(b"ck", max(max(num_cons, num_vars.0 + num_vars.1), ck_hint))
   }
 }
 
@@ -104,7 +104,7 @@ impl<E: Engine> R1CSShape<E> {
   /// Create an object of type `R1CSShape` from the explicitly specified R1CS matrices
   pub fn new(
     num_cons: usize,
-    num_vars: usize,
+    num_vars: (usize, usize),
     num_io: usize,
     A: SparseMatrix<E::Scalar>,
     B: SparseMatrix<E::Scalar>,
@@ -126,9 +126,9 @@ impl<E: Engine> R1CSShape<E> {
         .collect::<Result<Vec<()>, NovaError>>()
     };
 
-    is_valid(num_cons, num_vars, num_io, &A)?;
-    is_valid(num_cons, num_vars, num_io, &B)?;
-    is_valid(num_cons, num_vars, num_io, &C)?;
+    is_valid(num_cons, num_vars.0 + num_vars.1, num_io, &A)?;
+    is_valid(num_cons, num_vars.0 + num_vars.1, num_io, &B)?;
+    is_valid(num_cons, num_vars.0 + num_vars.1, num_io, &C)?;
 
     // We require the number of public inputs/outputs to be even
     if num_io % 2 != 0 {
@@ -160,9 +160,9 @@ impl<E: Engine> R1CSShape<E> {
   #[inline]
   pub(crate) fn is_regular_shape(&self) -> bool {
     let cons_valid = self.num_cons.next_power_of_two() == self.num_cons;
-    let vars_valid = self.num_vars.next_power_of_two() == self.num_vars;
+    let vars_valid = (self.num_vars.0 + self.num_vars.1).next_power_of_two() == (self.num_vars.0 + self.num_vars.1);
     let io_valid = self.num_io.next_power_of_two() == self.num_io;
-    let io_lt_vars = self.num_io < self.num_vars;
+    let io_lt_vars = self.num_io < self.num_vars.0 + self.num_vars.1;
     cons_valid && vars_valid && io_valid && io_lt_vars
   }
 
@@ -170,7 +170,7 @@ impl<E: Engine> R1CSShape<E> {
     &self,
     z: &[E::Scalar],
   ) -> Result<(Vec<E::Scalar>, Vec<E::Scalar>, Vec<E::Scalar>), NovaError> {
-    if z.len() != self.num_io + self.num_vars + 1 {
+    if z.len() != self.num_io + self.num_vars.0 + self.num_vars.1 + 1 {
       return Err(NovaError::InvalidWitnessLength);
     }
 
@@ -189,13 +189,14 @@ impl<E: Engine> R1CSShape<E> {
     U: &RelaxedR1CSInstance<E>,
     W: &RelaxedR1CSWitness<E>,
   ) -> Result<(), NovaError> {
-    assert_eq!(W.W.len(), self.num_vars);
+    assert_eq!(W.W.0.len(), self.num_vars.0);
+    assert_eq!(W.W.1.len(), self.num_vars.1);
     assert_eq!(W.E.len(), self.num_cons);
     assert_eq!(U.X.len(), self.num_io);
 
     // verify if Az * Bz = u*Cz + E
     let res_eq = {
-      let z = [W.W.clone(), vec![U.u], U.X.clone()].concat();
+      let z = [W.W.0.clone(), W.W.1.clone(), vec![U.u], U.X.clone()].concat();
       let (Az, Bz, Cz) = self.multiply_vec(&z)?;
       assert_eq!(Az.len(), self.num_cons);
       assert_eq!(Bz.len(), self.num_cons);
@@ -206,8 +207,10 @@ impl<E: Engine> R1CSShape<E> {
 
     // verify if comm_E and comm_W are commitments to E and W
     let res_comm = {
-      let (comm_W, comm_E) =
-        rayon::join(|| CE::<E>::commit(ck, &W.W), || CE::<E>::commit(ck, &W.E));
+      let (comm_W, comm_E) = rayon::join(
+        || (CE::<E>::commit(ck, &W.W.0), CE::<E>::commit(ck, &W.W.1)),
+        || CE::<E>::commit(ck, &W.E),
+      );
       U.comm_W == comm_W && U.comm_E == comm_E
     };
 
@@ -225,12 +228,19 @@ impl<E: Engine> R1CSShape<E> {
     U: &R1CSInstance<E>,
     W: &R1CSWitness<E>,
   ) -> Result<(), NovaError> {
-    assert_eq!(W.W.len(), self.num_vars);
+    assert_eq!(W.W.0.len(), self.num_vars.0);
+    assert_eq!(W.W.1.len(), self.num_vars.1);
     assert_eq!(U.X.len(), self.num_io);
 
     // verify if Az * Bz = u*Cz
     let res_eq = {
-      let z = [W.W.clone(), vec![E::Scalar::ONE], U.X.clone()].concat();
+      let z = [
+        W.W.0.clone(),
+        W.W.1.clone(),
+        vec![E::Scalar::ONE],
+        U.X.clone(),
+      ]
+      .concat();
       let (Az, Bz, Cz) = self.multiply_vec(&z)?;
       assert_eq!(Az.len(), self.num_cons);
       assert_eq!(Bz.len(), self.num_cons);
@@ -240,7 +250,7 @@ impl<E: Engine> R1CSShape<E> {
     };
 
     // verify if comm_W is a commitment to W
-    let res_comm = U.comm_W == CE::<E>::commit(ck, &W.W);
+    let res_comm = U.comm_W == (CE::<E>::commit(ck, &W.W.0), CE::<E>::commit(ck, &W.W.1));
 
     if res_eq && res_comm {
       Ok(())
@@ -260,12 +270,18 @@ impl<E: Engine> R1CSShape<E> {
     W2: &R1CSWitness<E>,
   ) -> Result<(Vec<E::Scalar>, Commitment<E>), NovaError> {
     let (AZ_1, BZ_1, CZ_1) = {
-      let Z1 = [W1.W.clone(), vec![U1.u], U1.X.clone()].concat();
+      let Z1 = [W1.W.0.clone(), W1.W.1.clone(), vec![U1.u], U1.X.clone()].concat();
       self.multiply_vec(&Z1)?
     };
 
     let (AZ_2, BZ_2, CZ_2) = {
-      let Z2 = [W2.W.clone(), vec![E::Scalar::ONE], U2.X.clone()].concat();
+      let Z2 = [
+        W2.W.0.clone(),
+        W2.W.1.clone(),
+        vec![E::Scalar::ONE],
+        U2.X.clone(),
+      ]
+      .concat();
       self.multiply_vec(&Z2)?
     };
 
@@ -306,19 +322,19 @@ impl<E: Engine> R1CSShape<E> {
   /// Renumbers variables to accommodate padded variables
   pub fn pad(&self) -> Self {
     // equalize the number of variables and constraints
-    let m = max(self.num_vars, self.num_cons).next_power_of_two();
+    let m = max(self.num_vars.0 + self.num_vars.1, self.num_cons).next_power_of_two();
 
     // check if the provided R1CSShape is already as required
-    if self.num_vars == m && self.num_cons == m {
+    if (self.num_vars.0 + self.num_vars.1) == m && self.num_cons == m {
       return self.clone();
     }
 
     // check if the number of variables are as expected, then
     // we simply set the number of constraints to the next power of two
-    if self.num_vars == m {
+    if (self.num_vars.0 + self.num_vars.1) == m {
       return R1CSShape {
         num_cons: m,
-        num_vars: m,
+        num_vars: self.num_vars,
         num_io: self.num_io,
         A: self.A.clone(),
         B: self.B.clone(),
@@ -333,12 +349,12 @@ impl<E: Engine> R1CSShape<E> {
 
     let apply_pad = |mut M: SparseMatrix<E::Scalar>| -> SparseMatrix<E::Scalar> {
       M.indices.par_iter_mut().for_each(|c| {
-        if *c >= self.num_vars {
-          *c += num_vars_padded - self.num_vars
+        if *c >= (self.num_vars.0 + self.num_vars.1) {
+          *c += num_vars_padded - (self.num_vars.0 + self.num_vars.1)
         }
       });
 
-      M.cols += num_vars_padded - self.num_vars;
+      M.cols += num_vars_padded - (self.num_vars.0 + self.num_vars.1);
 
       let ex = {
         let nnz = M.indptr.last().unwrap();
@@ -354,7 +370,7 @@ impl<E: Engine> R1CSShape<E> {
 
     R1CSShape {
       num_cons: num_cons_padded,
-      num_vars: num_vars_padded,
+      num_vars: (self.num_vars.0, num_vars_padded - self.num_vars.0),
       num_io: self.num_io,
       A: A_padded,
       B: B_padded,
@@ -366,17 +382,25 @@ impl<E: Engine> R1CSShape<E> {
 
 impl<E: Engine> R1CSWitness<E> {
   /// A method to create a witness object using a vector of scalars
-  pub fn new(S: &R1CSShape<E>, W: &[E::Scalar]) -> Result<R1CSWitness<E>, NovaError> {
-    if S.num_vars != W.len() {
+  pub fn new(
+    S: &R1CSShape<E>,
+    W: (&[E::Scalar], &[E::Scalar]),
+  ) -> Result<R1CSWitness<E>, NovaError> {
+    if S.num_vars != (W.0.len(), W.1.len()) {
       Err(NovaError::InvalidWitnessLength)
     } else {
-      Ok(R1CSWitness { W: W.to_owned() })
+      Ok(R1CSWitness {
+        W: (W.0.to_vec(), W.1.to_vec()),
+      })
     }
   }
 
   /// Commits to the witness using the supplied generators
-  pub fn commit(&self, ck: &CommitmentKey<E>) -> Commitment<E> {
-    CE::<E>::commit(ck, &self.W)
+  pub fn commit(&self, ck: &CommitmentKey<E>) -> (Commitment<E>, Commitment<E>) {
+    (
+      CE::<E>::commit(ck, &self.W.0),
+      CE::<E>::commit(ck, &self.W.1),
+    )
   }
 }
 
@@ -384,7 +408,7 @@ impl<E: Engine> R1CSInstance<E> {
   /// A method to create an instance object using consitituent elements
   pub fn new(
     S: &R1CSShape<E>,
-    comm_W: &Commitment<E>,
+    comm_W: &(Commitment<E>, Commitment<E>),
     X: &[E::Scalar],
   ) -> Result<R1CSInstance<E>, NovaError> {
     if S.num_io != X.len() {
@@ -400,7 +424,8 @@ impl<E: Engine> R1CSInstance<E> {
 
 impl<E: Engine> AbsorbInROTrait<E> for R1CSInstance<E> {
   fn absorb_in_ro(&self, ro: &mut E::RO) {
-    self.comm_W.absorb_in_ro(ro);
+    self.comm_W.0.absorb_in_ro(ro);
+    self.comm_W.1.absorb_in_ro(ro);
     for x in &self.X {
       ro.absorb(scalar_as_base::<E>(*x));
     }
@@ -411,7 +436,10 @@ impl<E: Engine> RelaxedR1CSWitness<E> {
   /// Produces a default `RelaxedR1CSWitness` given an `R1CSShape`
   pub fn default(S: &R1CSShape<E>) -> RelaxedR1CSWitness<E> {
     RelaxedR1CSWitness {
-      W: vec![E::Scalar::ZERO; S.num_vars],
+      W: (
+        vec![E::Scalar::ZERO; S.num_vars.0],
+        vec![E::Scalar::ZERO; S.num_vars.1],
+      ),
       E: vec![E::Scalar::ZERO; S.num_cons],
     }
   }
@@ -425,8 +453,14 @@ impl<E: Engine> RelaxedR1CSWitness<E> {
   }
 
   /// Commits to the witness using the supplied generators
-  pub fn commit(&self, ck: &CommitmentKey<E>) -> (Commitment<E>, Commitment<E>) {
-    (CE::<E>::commit(ck, &self.W), CE::<E>::commit(ck, &self.E))
+  pub fn commit(&self, ck: &CommitmentKey<E>) -> ((Commitment<E>, Commitment<E>), Commitment<E>) {
+    (
+      (
+        CE::<E>::commit(ck, &self.W.0),
+        CE::<E>::commit(ck, &self.W.1),
+      ),
+      CE::<E>::commit(ck, &self.E),
+    )
   }
 
   /// Folds an incoming `R1CSWitness` into the current one
@@ -439,15 +473,31 @@ impl<E: Engine> RelaxedR1CSWitness<E> {
     let (W1, E1) = (&self.W, &self.E);
     let W2 = &W2.W;
 
-    if W1.len() != W2.len() {
+    if (W1.0.len() != W2.0.len()) || (W1.1.len() != W2.1.len()) {
       return Err(NovaError::InvalidWitnessLength);
     }
 
-    let W = W1
+
+    let W0 = W1.0
       .par_iter()
-      .zip(W2)
-      .map(|(a, b)| *a + *r * *b)
+      .zip(&W2.0)
+      .map(|(a, b)| (*a + *r * *b))
       .collect::<Vec<E::Scalar>>();
+
+    let W1 = W1.1
+      .par_iter()
+      .zip(&W2.1)
+      .map(|(a, b)| (*a + *r * *b))
+      .collect::<Vec<E::Scalar>>();
+
+    // let W = W1
+    //   .par_iter()
+    //   .zip(W2)
+    //   .map(|((a1, a2), (b1, b2))| ((*a1 + *r * *b1), (*a2 + *r * *b2)))
+    //   .collect::<(Vec<E::Scalar>, Vec<E::Scalar>)>();
+
+    let W = (W0, W1);
+
     let E = E1
       .par_iter()
       .zip(T)
@@ -459,7 +509,8 @@ impl<E: Engine> RelaxedR1CSWitness<E> {
   /// Pads the provided witness to the correct length
   pub fn pad(&self, S: &R1CSShape<E>) -> RelaxedR1CSWitness<E> {
     let mut W = self.W.clone();
-    W.extend(vec![E::Scalar::ZERO; S.num_vars - W.len()]);
+    W.0.extend(vec![E::Scalar::ZERO; S.num_vars.0 - W.0.len()]);
+    W.1.extend(vec![E::Scalar::ZERO; S.num_vars.1 - W.1.len()]);
 
     let mut E = self.E.clone();
     E.extend(vec![E::Scalar::ZERO; S.num_cons - E.len()]);
@@ -471,7 +522,10 @@ impl<E: Engine> RelaxedR1CSWitness<E> {
 impl<E: Engine> RelaxedR1CSInstance<E> {
   /// Produces a default `RelaxedR1CSInstance` given `R1CSGens` and `R1CSShape`
   pub fn default(_ck: &CommitmentKey<E>, S: &R1CSShape<E>) -> RelaxedR1CSInstance<E> {
-    let (comm_W, comm_E) = (Commitment::<E>::default(), Commitment::<E>::default());
+    let (comm_W, comm_E) = (
+      (Commitment::<E>::default(), Commitment::<E>::default()),
+      Commitment::<E>::default(),
+    );
     RelaxedR1CSInstance {
       comm_W,
       comm_E,
@@ -495,11 +549,11 @@ impl<E: Engine> RelaxedR1CSInstance<E> {
 
   /// Initializes a new `RelaxedR1CSInstance` from an `R1CSInstance`
   pub fn from_r1cs_instance_unchecked(
-    comm_W: &Commitment<E>,
+    comm_W: &(Commitment<E>, Commitment<E>),
     X: &[E::Scalar],
   ) -> RelaxedR1CSInstance<E> {
     RelaxedR1CSInstance {
-      comm_W: *comm_W,
+      comm_W: *comm_W, 
       comm_E: Commitment::<E>::default(),
       u: E::Scalar::ONE,
       X: X.to_vec(),
@@ -523,9 +577,12 @@ impl<E: Engine> RelaxedR1CSInstance<E> {
       .zip(X2)
       .map(|(a, b)| *a + *r * *b)
       .collect::<Vec<E::Scalar>>();
-    let comm_W = *comm_W_1 + *comm_W_2 * *r;
+    let comm_W = (
+      comm_W_1.0.clone() + comm_W_2.0.clone() * *r,
+      comm_W_1.1.clone() + comm_W_2.1.clone() * *r,
+    );
     let comm_E = *comm_E_1 + *comm_T * *r;
-    let u = *u1 + *r;
+    let u: <E as Engine>::Scalar = *u1 + *r;
 
     RelaxedR1CSInstance {
       comm_W,
@@ -539,7 +596,8 @@ impl<E: Engine> RelaxedR1CSInstance<E> {
 impl<E: Engine> TranscriptReprTrait<E::GE> for RelaxedR1CSInstance<E> {
   fn to_transcript_bytes(&self) -> Vec<u8> {
     [
-      self.comm_W.to_transcript_bytes(),
+      self.comm_W.0.to_transcript_bytes(),
+      self.comm_W.1.to_transcript_bytes(),
       self.comm_E.to_transcript_bytes(),
       self.u.to_transcript_bytes(),
       self.X.as_slice().to_transcript_bytes(),
@@ -550,7 +608,8 @@ impl<E: Engine> TranscriptReprTrait<E::GE> for RelaxedR1CSInstance<E> {
 
 impl<E: Engine> AbsorbInROTrait<E> for RelaxedR1CSInstance<E> {
   fn absorb_in_ro(&self, ro: &mut E::RO) {
-    self.comm_W.absorb_in_ro(ro);
+    self.comm_W.0.absorb_in_ro(ro);
+    self.comm_W.1.absorb_in_ro(ro);
     self.comm_E.absorb_in_ro(ro);
     ro.absorb(scalar_as_base::<E>(self.u));
 
@@ -576,7 +635,7 @@ mod tests {
   };
 
   fn tiny_r1cs<E: Engine>(num_vars: usize) -> R1CSShape<E> {
-    let one = <E::Scalar as Field>::ONE;
+    let one: <E as Engine>::Scalar = <E::Scalar as Field>::ONE;
     let (num_cons, num_vars, num_io, A, B, C) = {
       let num_cons = 4;
       let num_io = 2;
@@ -631,7 +690,7 @@ mod tests {
 
     let res = R1CSShape::new(
       num_cons,
-      num_vars,
+      (num_vars, 0),
       num_io,
       SparseMatrix::new(&A, rows, cols),
       SparseMatrix::new(&B, rows, cols),

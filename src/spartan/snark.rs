@@ -81,7 +81,7 @@ pub struct RelaxedR1CSSNARK<E: Engine, EE: EvaluationEngineTrait<E>> {
   claims_outer: (E::Scalar, E::Scalar, E::Scalar),
   eval_E: E::Scalar,
   sc_proof_inner: SumcheckProof<E>,
-  eval_W: E::Scalar,
+  eval_W: (E::Scalar, E::Scalar),
   sc_proof_batch: SumcheckProof<E>,
   evals_batch: Vec<E::Scalar>,
   eval_arg: EE::EvaluationArgument,
@@ -130,11 +130,11 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
     transcript.absorb(b"U", U);
 
     // compute the full satisfying assignment by concatenating W.W, U.u, and U.X
-    let mut z = [W.W.clone(), vec![U.u], U.X.clone()].concat();
+    let mut z = [W.W.0.clone(), W.W.1.clone(), vec![U.u], U.X.clone()].concat();
 
     let (num_rounds_x, num_rounds_y) = (
       usize::try_from(S.num_cons.ilog2()).unwrap(),
-      (usize::try_from(S.num_vars.ilog2()).unwrap() + 1),
+      (usize::try_from((S.num_vars.0 + S.num_vars.1).ilog2()).unwrap() + 1),
     );
 
     // outer sum-check
@@ -205,19 +205,19 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
 
           let (A_evals, (B_evals, C_evals)) = rayon::join(
             || {
-              let mut A_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; 2 * S.num_vars];
+              let mut A_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; S.num_vars.0 + S.num_vars.1];
               inner(&S.A, &mut A_evals);
               A_evals
             },
             || {
               rayon::join(
                 || {
-                  let mut B_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; 2 * S.num_vars];
+                  let mut B_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; S.num_vars.0 + S.num_vars.1];
                   inner(&S.B, &mut B_evals);
                   B_evals
                 },
                 || {
-                  let mut C_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; 2 * S.num_vars];
+                  let mut C_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; S.num_vars.0 + S.num_vars.1];
                   inner(&S.C, &mut C_evals);
                   C_evals
                 },
@@ -239,7 +239,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
     };
 
     let poly_z = {
-      z.resize(S.num_vars * 2, E::Scalar::ZERO);
+      z.resize(S.num_vars.0 + S.num_vars.1, E::Scalar::ZERO);
       z
     };
 
@@ -257,13 +257,23 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
 
     // add additional claims about W and E polynomials to the list from CC
     let mut w_u_vec = Vec::new();
-    let eval_W = MultilinearPolynomial::evaluate_with(&W.W, &r_y[1..]);
+    let eval_W0 = MultilinearPolynomial::evaluate_with(&W.W.0, &r_y[1..]);
+    let eval_W1 = MultilinearPolynomial::evaluate_with(&W.W.1, &r_y[1..]);
     w_u_vec.push((
-      PolyEvalWitness { p: W.W.clone() },
+      PolyEvalWitness { p: W.W.0.clone() },
       PolyEvalInstance {
-        c: U.comm_W,
+        c: U.comm_W.0,
         x: r_y[1..].to_vec(),
-        e: eval_W,
+        e: eval_W0,
+      },
+    ));
+
+    w_u_vec.push((
+      PolyEvalWitness { p: W.W.1.clone() },
+      PolyEvalInstance {
+        c: U.comm_W.1,
+        x: r_y[1..].to_vec(),
+        e: eval_W1,
       },
     ));
 
@@ -357,7 +367,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
       claims_outer: (claim_Az, claim_Bz, claim_Cz),
       eval_E,
       sc_proof_inner,
-      eval_W,
+      eval_W: (eval_W0, eval_W1),
       sc_proof_batch,
       evals_batch: claims_batch_left,
       eval_arg,
@@ -374,7 +384,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
 
     let (num_rounds_x, num_rounds_y) = (
       usize::try_from(vk.S.num_cons.ilog2()).unwrap(),
-      (usize::try_from(vk.S.num_vars.ilog2()).unwrap() + 1),
+      (usize::try_from((vk.S.num_vars.0 + vk.S.num_vars.1).ilog2()).unwrap() + 1),
     );
 
     // outer sum-check
@@ -428,10 +438,11 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
             .map(|i| (i + 1, U.X[i]))
             .collect::<Vec<(usize, E::Scalar)>>(),
         );
-        SparsePolynomial::new(usize::try_from(vk.S.num_vars.ilog2()).unwrap(), poly_X)
+        SparsePolynomial::new(usize::try_from((vk.S.num_vars.0 + vk.S.num_vars.1).ilog2()).unwrap(), poly_X)
           .evaluate(&r_y[1..])
       };
-      (E::Scalar::ONE - r_y[0]) * self.eval_W + r_y[0] * eval_X
+      // Arasu: not sure if this is correct
+      (E::Scalar::ONE - r_y[0]) * (self.eval_W.0 + self.eval_W.1) + r_y[0] * eval_X
     };
 
     // compute evaluations of R1CS matrices
@@ -473,9 +484,14 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
     // add claims about W and E polynomials
     let u_vec: Vec<PolyEvalInstance<E>> = vec![
       PolyEvalInstance {
-        c: U.comm_W,
+        c: U.comm_W.0,
         x: r_y[1..].to_vec(),
-        e: self.eval_W,
+        e: self.eval_W.0,
+      },
+      PolyEvalInstance {
+        c: U.comm_W.1,
+        x: r_y[1..].to_vec(),
+        e: self.eval_W.1,
       },
       PolyEvalInstance {
         c: U.comm_E,
