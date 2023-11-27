@@ -52,6 +52,8 @@ pub struct NovaAugmentedCircuitInputs<E: Engine> {
   i: E::Base,
   z0: Vec<E::Base>,
   zi: Option<Vec<E::Base>>,
+  // Arasu: let's see how this goes. It might have to be E2::base??? 
+  Ci: Option<E::Base>,
   U: Option<RelaxedR1CSInstance<E>>,
   u: Option<R1CSInstance<E>>,
   T: Option<Commitment<E>>,
@@ -64,6 +66,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
     i: E::Base,
     z0: Vec<E::Base>,
     zi: Option<Vec<E::Base>>,
+    Ci: Option<E::Base>,
     U: Option<RelaxedR1CSInstance<E>>,
     u: Option<R1CSInstance<E>>,
     T: Option<Commitment<E>>,
@@ -73,6 +76,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
       i,
       z0,
       zi,
+      Ci,
       U,
       u,
       T,
@@ -419,6 +423,7 @@ mod tests {
       None,
       None,
       None,
+      None,
     );
     let circuit1: NovaAugmentedCircuit<'_, E2, TrivialCircuit<<E2 as Engine>::Base>> =
       NovaAugmentedCircuit::new(primary_params, Some(inputs1), &tc1, ro_consts1);
@@ -434,6 +439,7 @@ mod tests {
       scalar_as_base::<E2>(zero2), // pass zero for testing
       zero2,
       vec![zero2],
+      None,
       None,
       None,
       Some(inst1),

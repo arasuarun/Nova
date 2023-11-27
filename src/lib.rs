@@ -319,6 +319,8 @@ where
   l_u_secondary: R1CSInstance<E2>,
   i: usize,
   zi_primary: Vec<E1::Scalar>,
+  // Arasu: This might have to be E2
+  Ci: E1::Scalar,
   zi_secondary: Vec<E2::Scalar>,
   _p: PhantomData<(C1, C2)>,
 }
@@ -352,6 +354,7 @@ where
       None,
       None,
       None,
+      None,
     );
 
     let circuit_primary: NovaAugmentedCircuit<'_, E2, C1> = NovaAugmentedCircuit::new(
@@ -375,6 +378,7 @@ where
       pp.digest(),
       E2::Scalar::ZERO,
       z0_secondary.to_vec(),
+      None,
       None,
       None,
       Some(u_primary.clone()),
@@ -420,6 +424,9 @@ where
       .collect::<Result<Vec<<E1 as Engine>::Scalar>, NovaError>>()
       .expect("Nova error synthesis");
 
+    // Arasu:
+    let Ci = E1::Scalar::ZERO;
+
     let zi_secondary = zi_secondary
       .iter()
       .map(|v| v.get_value().ok_or(NovaError::SynthesisError))
@@ -437,6 +444,7 @@ where
       l_u_secondary,
       i: 0,
       zi_primary,
+      Ci,
       zi_secondary,
       _p: Default::default(),
     })
@@ -475,6 +483,7 @@ where
       E1::Scalar::from(self.i as u64),
       self.z0_primary.to_vec(),
       Some(self.zi_primary.clone()),
+      Some(self.Ci.clone()),
       Some(self.r_U_secondary.clone()),
       Some(self.l_u_secondary.clone()),
       Some(Commitment::<E2>::decompress(&nifs_secondary.comm_T)?),
@@ -509,11 +518,14 @@ where
     .expect("Unable to fold primary");
 
     let mut cs_secondary = SatisfyingAssignment::<E2>::new();
+
     let inputs_secondary: NovaAugmentedCircuitInputs<E1> = NovaAugmentedCircuitInputs::new(
       pp.digest(),
       E2::Scalar::from(self.i as u64),
       self.z0_secondary.to_vec(),
       Some(self.zi_secondary.clone()),
+      // Arasu: idk what's happening here 
+      Some(E2::Scalar::ZERO),
       Some(self.r_U_primary.clone()),
       Some(l_u_primary),
       Some(Commitment::<E1>::decompress(&nifs_primary.comm_T)?),
