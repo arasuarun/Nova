@@ -320,8 +320,9 @@ where
   l_u_secondary: R1CSInstance<E2>,
   i: usize,
   zi_primary: Vec<E1::Scalar>,
-  Ci: E1::Scalar,
+  Ci_primary: E1::Scalar,
   zi_secondary: Vec<E2::Scalar>,
+  Ci_secondary: E2::Scalar,
   _p: PhantomData<(C1, C2)>,
 }
 
@@ -351,7 +352,7 @@ where
       scalar_as_base::<E1>(pp.digest()),
       E1::Scalar::ZERO,
       z0_primary.to_vec(),
-      E1::Scalar::ZERO,
+      C_star,
       None,
       None,
       None,
@@ -365,7 +366,9 @@ where
       c_primary,
       pp.ro_consts_circuit_primary.clone(),
     );
-    let zi_primary = circuit_primary
+
+    // Arasu: the base case of Ci is currently 0
+    let (zi_primary, Ci_primary) = circuit_primary
       .synthesize(&mut cs_primary)
       .map_err(|_| NovaError::SynthesisError)
       .expect("Nova error synthesis");
@@ -393,7 +396,7 @@ where
       c_secondary,
       pp.ro_consts_circuit_secondary.clone(),
     );
-    let zi_secondary = circuit_secondary
+    let (zi_secondary, Ci_secondary) = circuit_secondary
       .synthesize(&mut cs_secondary)
       .map_err(|_| NovaError::SynthesisError)
       .expect("Nova error synthesis");
@@ -427,10 +430,22 @@ where
       .collect::<Result<Vec<<E1 as Engine>::Scalar>, NovaError>>()
       .expect("Nova error synthesis");
 
+    // In the base case, C_i is not changed 
+    let Ci_primary = Ci_primary
+      .get_value()
+      .ok_or(NovaError::SynthesisError)
+      .expect("Nova error synthesis");
+
     let zi_secondary = zi_secondary
       .iter()
       .map(|v| v.get_value().ok_or(NovaError::SynthesisError))
       .collect::<Result<Vec<<E2 as Engine>::Scalar>, NovaError>>()
+      .expect("Nova error synthesis");
+
+    // In the base case, C_i is not changed 
+    let Ci_secondary = Ci_secondary
+      .get_value()
+      .ok_or(NovaError::SynthesisError)
       .expect("Nova error synthesis");
 
     Ok(Self {
@@ -445,8 +460,9 @@ where
       l_u_secondary,
       i: 0,
       zi_primary,
-      Ci: <E1 as Engine>::Scalar::ZERO, // Arasu: TODO -- change this to be a result of circuit_primary.synthesize 
+      Ci_primary, 
       zi_secondary,
+      Ci_secondary,
       _p: Default::default(),
     })
   }
@@ -485,7 +501,7 @@ where
       self.z0_primary.to_vec(),
       self.C_star.clone(), // Arasu: set C_star primary
       Some(self.zi_primary.clone()),
-      Some(self.Ci.clone()),
+      Some(self.Ci_primary.clone()),
       Some(self.r_U_secondary.clone()),
       Some(self.l_u_secondary.clone()),
       Some(Commitment::<E2>::decompress(&nifs_secondary.comm_T)?),
@@ -497,7 +513,10 @@ where
       c_primary,
       pp.ro_consts_circuit_primary.clone(),
     );
-    let zi_primary = circuit_primary
+
+    // TODO: check where exactly Ci_primary was being updated 
+
+    let (zi_primary, Ci_primary) = circuit_primary
       .synthesize(&mut cs_primary)
       .map_err(|_| NovaError::SynthesisError)?;
 
@@ -526,7 +545,7 @@ where
       self.z0_secondary.to_vec(),
       E2::Scalar::ZERO, // Arasu: C_star secondary is always 0
       Some(self.zi_secondary.clone()),
-      Some(E2::Scalar::ZERO), // Arasu: C_i is also set to 0
+      Some(self.Ci_secondary.clone()), // Arasu: C_i is also set to 0
       Some(self.r_U_primary.clone()),
       Some(l_u_primary),
       Some(Commitment::<E1>::decompress(&nifs_primary.comm_T)?),
@@ -538,7 +557,7 @@ where
       c_secondary,
       pp.ro_consts_circuit_secondary.clone(),
     );
-    let zi_secondary = circuit_secondary
+    let (zi_secondary, Ci_secondary) = circuit_secondary
       .synthesize(&mut cs_secondary)
       .map_err(|_| NovaError::SynthesisError)?;
 
@@ -551,10 +570,19 @@ where
       .iter()
       .map(|v| v.get_value().ok_or(NovaError::SynthesisError))
       .collect::<Result<Vec<<E1 as Engine>::Scalar>, NovaError>>()?;
+
+    self.Ci_primary = Ci_primary
+      .get_value()
+      .ok_or(NovaError::SynthesisError)?;
+
     self.zi_secondary = zi_secondary
       .iter()
       .map(|v| v.get_value().ok_or(NovaError::SynthesisError))
       .collect::<Result<Vec<<E2 as Engine>::Scalar>, NovaError>>()?;
+
+    self.Ci_secondary = Ci_secondary
+      .get_value()
+      .ok_or(NovaError::SynthesisError)?;
 
     self.l_u_secondary = l_u_secondary;
     self.l_w_secondary = l_w_secondary;
@@ -616,7 +644,7 @@ where
       for e in &self.zi_primary {
         hasher.absorb(*e);
       }
-      hasher.absorb(self.Ci); // Arasu: added C_i to hash for verifier
+      hasher.absorb(self.Ci_primary); // Arasu: added C_i to hash for verifier
       self.r_U_secondary.absorb_in_ro(&mut hasher);
 
       let mut hasher2 = <E1 as Engine>::RO::new(
@@ -632,7 +660,7 @@ where
       for e in &self.zi_secondary {
         hasher2.absorb(*e);
       }
-      hasher2.absorb(E2::Scalar::ZERO); // Arasu: C_i is always 0 in secondary 
+      hasher2.absorb(self.Ci_secondary); 
       self.r_U_primary.absorb_in_ro(&mut hasher2);
 
       (

@@ -65,7 +65,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
     params: E::Scalar,
     i: E::Base,
     z0: Vec<E::Base>,
-    C_star: E::Base, 
+    C_star: E::Base,
     zi: Option<Vec<E::Base>>,
     Ci: Option<E::Base>,
     U: Option<RelaxedR1CSInstance<E>>,
@@ -149,9 +149,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       .collect::<Result<Vec<AllocatedNum<E::Base>>, _>>()?;
 
     // Arasu: here is where C_star is synthesized
-    let C_star = AllocatedNum::alloc(cs.namespace(|| "C_star"), || {
-      Ok(self.inputs.get()?.C_star)
-    })?;
+    let C_star = AllocatedNum::alloc(cs.namespace(|| "C_star"), || Ok(self.inputs.get()?.C_star))?;
 
     // Allocate zi. If inputs.zi is not provided (base case) allocate default value 0
     let zero = vec![E::Base::ZERO; arity];
@@ -234,7 +232,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     z_0: &[AllocatedNum<E::Base>],
     C_star: &AllocatedNum<E::Base>,
     z_i: &[AllocatedNum<E::Base>],
-    C_i: &AllocatedNum<E::Base>, 
+    C_i: &AllocatedNum<E::Base>,
     U: &AllocatedRelaxedR1CSInstance<E>,
     u: &AllocatedR1CSInstance<E>,
     T: &AllocatedPoint<E>,
@@ -285,7 +283,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
   pub fn synthesize<CS: ConstraintSystem<<E as Engine>::Base>>(
     self,
     cs: &mut CS,
-  ) -> Result<Vec<AllocatedNum<E::Base>>, SynthesisError> {
+  ) -> Result<(Vec<AllocatedNum<E::Base>>, AllocatedNum<E::Base>), SynthesisError> {
     let arity = self.step_circuit.arity();
 
     // Allocate all witnesses
@@ -364,6 +362,11 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       ));
     }
 
+    // Arasu: compute C_{next} as just C_i + 1 for now (TODO)
+    let C_next = AllocatedNum::alloc(cs.namespace(|| "increment C_i"), || {
+      Ok(*C_i.get_value().get()? + E::Base::from(109u64))
+    })?;
+
     // Compute the new hash H(params, Unew, i+1, z0, z_{i+1})
     let mut ro = E::ROCircuit::new(self.ro_consts, NUM_FE_WITHOUT_IO_FOR_CRHF + 2 * arity);
     ro.absorb(&params);
@@ -371,11 +374,11 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     for e in &z_0 {
       ro.absorb(e);
     }
-    ro.absorb(&C_star); // Arasu: HERE is where C_star is added to the hash 
+    ro.absorb(&C_star); // Arasu: HERE is where C_star is added to the hash
     for e in &z_next {
       ro.absorb(e);
     }
-    ro.absorb(&C_i); // Arasu: HERE is where C_star is added to the hash 
+    ro.absorb(&C_next); // Arasu: HERE is where the updated C_i is added to the hash
     Unew.absorb_in_ro(cs.namespace(|| "absorb U_new"), &mut ro)?;
     let hash_bits = ro.squeeze(cs.namespace(|| "output hash bits"), NUM_HASH_BITS)?;
     let hash = le_bits_to_num(cs.namespace(|| "convert hash to num"), &hash_bits)?;
@@ -385,7 +388,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       .inputize(cs.namespace(|| "Output unmodified hash of the other circuit"))?;
     hash.inputize(cs.namespace(|| "output new hash of this circuit"))?;
 
-    Ok(z_next) // TODO: update and output C_i
+    Ok((z_next, C_next)) 
   }
 }
 
@@ -445,7 +448,7 @@ mod tests {
       scalar_as_base::<E1>(zero1), // pass zero for testing
       zero1,
       vec![zero1],
-      zero1, // Arasu: default C* here 
+      zero1, // Arasu: default C* here
       None,
       None,
       None,
@@ -491,7 +494,7 @@ mod tests {
     test_recursive_circuit_with::<PallasEngine, VestaEngine>(
       &params1, &params2, ro_consts1, ro_consts2, 9825, 10357,
     );
-    // Arasu: 
+    // Arasu:
     // test_recursive_circuit_with::<PallasEngine, VestaEngine>(
     //   &params1, &params2, ro_consts1, ro_consts2, 11831, 12363,
     // );
