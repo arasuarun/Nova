@@ -310,6 +310,7 @@ where
   C2: StepCircuit<E2::Scalar>,
 {
   z0_primary: Vec<E1::Scalar>,
+  C_star: E1::Scalar,
   z0_secondary: Vec<E2::Scalar>,
   r_W_primary: RelaxedR1CSWitness<E1>,
   r_U_primary: RelaxedR1CSInstance<E1>,
@@ -336,6 +337,7 @@ where
     c_primary: &C1,
     c_secondary: &C2,
     z0_primary: &[E1::Scalar],
+    C_star: E1::Scalar,
     z0_secondary: &[E2::Scalar],
   ) -> Result<Self, NovaError> {
     if z0_primary.len() != pp.F_arity_primary || z0_secondary.len() != pp.F_arity_secondary {
@@ -430,6 +432,7 @@ where
 
     Ok(Self {
       z0_primary: z0_primary.to_vec(),
+      C_star: C_star,
       z0_secondary: z0_secondary.to_vec(),
       r_W_primary,
       r_U_primary,
@@ -476,7 +479,7 @@ where
       scalar_as_base::<E1>(pp.digest()),
       E1::Scalar::from(self.i as u64),
       self.z0_primary.to_vec(),
-      E1::Scalar::ZERO, // Arasu: TODO -- change this C_star 
+      self.C_star.clone(), // Arasu: set C_star primary
       Some(self.zi_primary.clone()),
       Some(self.r_U_secondary.clone()),
       Some(self.l_u_secondary.clone()),
@@ -516,7 +519,7 @@ where
       pp.digest(),
       E2::Scalar::from(self.i as u64),
       self.z0_secondary.to_vec(),
-      E2::Scalar::ZERO, // Arasu: TODO -- change this C_star 
+      E2::Scalar::ZERO, // Arasu: C_star secondary is always 0
       Some(self.zi_secondary.clone()),
       Some(self.r_U_primary.clone()),
       Some(l_u_primary),
@@ -567,6 +570,7 @@ where
     pp: &PublicParams<E1, E2, C1, C2>,
     num_steps: usize,
     z0_primary: &[E1::Scalar],
+    C_star: E1::Scalar,
     z0_secondary: &[E2::Scalar],
   ) -> Result<(Vec<E1::Scalar>, Vec<E2::Scalar>), NovaError> {
     // number of steps cannot be zero
@@ -602,6 +606,7 @@ where
       for e in z0_primary {
         hasher.absorb(*e);
       }
+      hasher.absorb(C_star); // Arasu: added C_star to hash
       for e in &self.zi_primary {
         hasher.absorb(*e);
       }
@@ -616,6 +621,7 @@ where
       for e in z0_secondary {
         hasher2.absorb(*e);
       }
+      hasher2.absorb(E2::Scalar::ZERO); // Arasu: C_star is always 0 in secondary 
       for e in &self.zi_secondary {
         hasher2.absorb(*e);
       }
@@ -837,6 +843,7 @@ where
     vk: &VerifierKey<E1, E2, C1, C2, S1, S2>,
     num_steps: usize,
     z0_primary: &[E1::Scalar],
+    C_star: E1::Scalar,
     z0_secondary: &[E2::Scalar],
   ) -> Result<(Vec<E1::Scalar>, Vec<E2::Scalar>), NovaError> {
     // the number of steps cannot be zero
@@ -863,6 +870,7 @@ where
       for e in z0_primary {
         hasher.absorb(*e);
       }
+      hasher.absorb(C_star); // Arasu: added C_star to hash
       for e in &self.zn_primary {
         hasher.absorb(*e);
       }
@@ -1117,6 +1125,7 @@ mod tests {
       &test_circuit1,
       &test_circuit2,
       &[<E1 as Engine>::Scalar::ZERO],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     )
     .unwrap();
@@ -1176,6 +1185,7 @@ mod tests {
       &circuit_primary,
       &circuit_secondary,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     )
     .unwrap();
@@ -1258,6 +1268,7 @@ mod tests {
       &circuit_primary,
       &circuit_secondary,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     )
     .unwrap();
@@ -1356,6 +1367,7 @@ mod tests {
       &circuit_primary,
       &circuit_secondary,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     )
     .unwrap();
@@ -1522,6 +1534,7 @@ mod tests {
       &roots[0],
       &circuit_secondary,
       &z0_primary,
+      <E1 as Engine>::Scalar::ZERO, // Arasu: setting this to 0 for the test
       &z0_secondary,
     )
     .unwrap();
@@ -1590,6 +1603,7 @@ mod tests {
       &test_circuit1,
       &test_circuit2,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO, // Arasu: setting C_star to 0 for the test
       &[<E2 as Engine>::Scalar::ZERO],
     )
     .unwrap();
