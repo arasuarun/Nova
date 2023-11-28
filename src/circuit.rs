@@ -51,6 +51,7 @@ pub struct NovaAugmentedCircuitInputs<E: Engine> {
   params: E::Scalar,
   i: E::Base,
   z0: Vec<E::Base>,
+  C_star: E::Base,
   zi: Option<Vec<E::Base>>,
   U: Option<RelaxedR1CSInstance<E>>,
   u: Option<R1CSInstance<E>>,
@@ -63,6 +64,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
     params: E::Scalar,
     i: E::Base,
     z0: Vec<E::Base>,
+    C_star: E::Base, 
     zi: Option<Vec<E::Base>>,
     U: Option<RelaxedR1CSInstance<E>>,
     u: Option<R1CSInstance<E>>,
@@ -72,6 +74,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
       params,
       i,
       z0,
+      C_star,
       zi,
       U,
       u,
@@ -115,6 +118,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       AllocatedNum<E::Base>,
       AllocatedNum<E::Base>,
       Vec<AllocatedNum<E::Base>>,
+      AllocatedNum<E::Base>,
       Vec<AllocatedNum<E::Base>>,
       AllocatedRelaxedR1CSInstance<E>,
       AllocatedR1CSInstance<E>,
@@ -139,6 +143,11 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
         })
       })
       .collect::<Result<Vec<AllocatedNum<E::Base>>, _>>()?;
+
+    // Arasu: here is where C_star is synthesized
+    let C_star = AllocatedNum::alloc(cs.namespace(|| "C_star"), || {
+      Ok(self.inputs.get()?.C_star)
+    })?;
 
     // Allocate zi. If inputs.zi is not provided (base case) allocate default value 0
     let zero = vec![E::Base::ZERO; arity];
@@ -174,7 +183,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     )?;
     T.check_on_curve(cs.namespace(|| "check T on curve"))?;
 
-    Ok((params, i, z_0, z_i, U, u, T))
+    Ok((params, i, z_0, C_star, z_i, U, u, T))
   }
 
   /// Synthesizes base case and returns the new relaxed `R1CSInstance`
@@ -210,6 +219,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     params: &AllocatedNum<E::Base>,
     i: &AllocatedNum<E::Base>,
     z_0: &[AllocatedNum<E::Base>],
+    C_star: &AllocatedNum<E::Base>,
     z_i: &[AllocatedNum<E::Base>],
     U: &AllocatedRelaxedR1CSInstance<E>,
     u: &AllocatedR1CSInstance<E>,
@@ -226,6 +236,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     for e in z_0 {
       ro.absorb(e);
     }
+    ro.absorb(&C_star);
     for e in z_i {
       ro.absorb(e);
     }
@@ -263,7 +274,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     let arity = self.step_circuit.arity();
 
     // Allocate all witnesses
-    let (params, i, z_0, z_i, U, u, T) =
+    let (params, i, z_0, C_star, z_i, U, u, T) =
       self.alloc_witness(cs.namespace(|| "allocate the circuit witness"), arity)?;
 
     // Compute variable indicating if this is the base case
@@ -280,6 +291,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       &params,
       &i,
       &z_0,
+      &C_star,
       &z_i,
       &U,
       &u,
@@ -343,6 +355,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     for e in &z_0 {
       ro.absorb(e);
     }
+    ro.absorb(&C_star); // Arasu: HERE is where C_star is added to the hash 
     for e in &z_next {
       ro.absorb(e);
     }
@@ -415,6 +428,7 @@ mod tests {
       scalar_as_base::<E1>(zero1), // pass zero for testing
       zero1,
       vec![zero1],
+      zero1, // Arasu: default C* here 
       None,
       None,
       None,
@@ -434,6 +448,7 @@ mod tests {
       scalar_as_base::<E2>(zero2), // pass zero for testing
       zero2,
       vec![zero2],
+      zero2, // Arasu: default C* here too
       None,
       None,
       Some(inst1),
