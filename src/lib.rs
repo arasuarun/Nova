@@ -320,6 +320,7 @@ where
   l_u_secondary: R1CSInstance<E2>,
   i: usize,
   zi_primary: Vec<E1::Scalar>,
+  Ci: E1::Scalar,
   zi_secondary: Vec<E2::Scalar>,
   _p: PhantomData<(C1, C2)>,
 }
@@ -355,6 +356,7 @@ where
       None,
       None,
       None,
+      None,
     );
 
     let circuit_primary: NovaAugmentedCircuit<'_, E2, C1> = NovaAugmentedCircuit::new(
@@ -379,6 +381,7 @@ where
       E2::Scalar::ZERO,
       z0_secondary.to_vec(),
       E2::Scalar::ZERO,
+      None,
       None,
       None,
       Some(u_primary.clone()),
@@ -442,6 +445,7 @@ where
       l_u_secondary,
       i: 0,
       zi_primary,
+      Ci: <E1 as Engine>::Scalar::ZERO, // Arasu: TODO -- change this to be a result of circuit_primary.synthesize 
       zi_secondary,
       _p: Default::default(),
     })
@@ -481,6 +485,7 @@ where
       self.z0_primary.to_vec(),
       self.C_star.clone(), // Arasu: set C_star primary
       Some(self.zi_primary.clone()),
+      Some(self.Ci.clone()),
       Some(self.r_U_secondary.clone()),
       Some(self.l_u_secondary.clone()),
       Some(Commitment::<E2>::decompress(&nifs_secondary.comm_T)?),
@@ -521,6 +526,7 @@ where
       self.z0_secondary.to_vec(),
       E2::Scalar::ZERO, // Arasu: C_star secondary is always 0
       Some(self.zi_secondary.clone()),
+      Some(E2::Scalar::ZERO), // Arasu: C_i is also set to 0
       Some(self.r_U_primary.clone()),
       Some(l_u_primary),
       Some(Commitment::<E1>::decompress(&nifs_primary.comm_T)?),
@@ -610,6 +616,7 @@ where
       for e in &self.zi_primary {
         hasher.absorb(*e);
       }
+      hasher.absorb(self.Ci); // Arasu: added C_i to hash for verifier
       self.r_U_secondary.absorb_in_ro(&mut hasher);
 
       let mut hasher2 = <E1 as Engine>::RO::new(
@@ -625,6 +632,7 @@ where
       for e in &self.zi_secondary {
         hasher2.absorb(*e);
       }
+      hasher2.absorb(E2::Scalar::ZERO); // Arasu: C_i is always 0 in secondary 
       self.r_U_primary.absorb_in_ro(&mut hasher2);
 
       (
@@ -874,6 +882,7 @@ where
       for e in &self.zn_primary {
         hasher.absorb(*e);
       }
+      // hasher.absorb(self.Ci); // Arasu TODO: added C_i to hash for verifier
       self.r_U_secondary.absorb_in_ro(&mut hasher);
 
       let mut hasher2 = <E1 as Engine>::RO::new(
@@ -1139,6 +1148,7 @@ mod tests {
       &pp,
       num_steps,
       &[<E1 as Engine>::Scalar::ZERO],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());
@@ -1199,6 +1209,7 @@ mod tests {
         &pp,
         i + 1,
         &[<E1 as Engine>::Scalar::ONE],
+        <E1 as Engine>::Scalar::ZERO,
         &[<E2 as Engine>::Scalar::ZERO],
       );
       assert!(res.is_ok());
@@ -1209,6 +1220,7 @@ mod tests {
       &pp,
       num_steps,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());
@@ -1283,6 +1295,7 @@ mod tests {
       &pp,
       num_steps,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());
@@ -1312,6 +1325,7 @@ mod tests {
       &vk,
       num_steps,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());
@@ -1382,6 +1396,7 @@ mod tests {
       &pp,
       num_steps,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO, 
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());
@@ -1416,6 +1431,7 @@ mod tests {
       &vk,
       num_steps,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());
@@ -1545,7 +1561,7 @@ mod tests {
     }
 
     // verify the recursive SNARK
-    let res = recursive_snark.verify(&pp, num_steps, &z0_primary, &z0_secondary);
+    let res = recursive_snark.verify(&pp, num_steps, &z0_primary, <E1 as Engine>::Scalar::ZERO, &z0_secondary);
     assert!(res.is_ok());
 
     // produce the prover and verifier keys for compressed snark
@@ -1558,7 +1574,7 @@ mod tests {
     let compressed_snark = res.unwrap();
 
     // verify the compressed SNARK
-    let res = compressed_snark.verify(&vk, num_steps, &z0_primary, &z0_secondary);
+    let res = compressed_snark.verify(&vk, num_steps, &z0_primary, <E1 as Engine>::Scalar::ZERO, &z0_secondary);
     assert!(res.is_ok());
   }
 
@@ -1618,6 +1634,7 @@ mod tests {
       &pp,
       num_steps,
       &[<E1 as Engine>::Scalar::ONE],
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());

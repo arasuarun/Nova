@@ -53,6 +53,7 @@ pub struct NovaAugmentedCircuitInputs<E: Engine> {
   z0: Vec<E::Base>,
   C_star: E::Base,
   zi: Option<Vec<E::Base>>,
+  Ci: Option<E::Base>,
   U: Option<RelaxedR1CSInstance<E>>,
   u: Option<R1CSInstance<E>>,
   T: Option<Commitment<E>>,
@@ -66,6 +67,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
     z0: Vec<E::Base>,
     C_star: E::Base, 
     zi: Option<Vec<E::Base>>,
+    Ci: Option<E::Base>,
     U: Option<RelaxedR1CSInstance<E>>,
     u: Option<R1CSInstance<E>>,
     T: Option<Commitment<E>>,
@@ -76,6 +78,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
       z0,
       C_star,
       zi,
+      Ci,
       U,
       u,
       T,
@@ -120,6 +123,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       Vec<AllocatedNum<E::Base>>,
       AllocatedNum<E::Base>,
       Vec<AllocatedNum<E::Base>>,
+      AllocatedNum<E::Base>,
       AllocatedRelaxedR1CSInstance<E>,
       AllocatedR1CSInstance<E>,
       AllocatedPoint<E>,
@@ -159,6 +163,15 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       })
       .collect::<Result<Vec<AllocatedNum<E::Base>>, _>>()?;
 
+    // Arasu: here is where Ci is synthesized
+    // let C_i= AllocatedNum::alloc(cs.namespace(|| "C_i"), || {
+    //   Ok(self.inputs.get()?.Ci.ok_or(SynthesisError::AssignmentMissing)?)
+    // })?;
+    // TODO: defaulting to 0 if None
+    let C_i = AllocatedNum::alloc(cs.namespace(|| "C_i"), || {
+      Ok(*self.inputs.get()?.Ci.as_ref().unwrap_or(&E::Base::ZERO))
+    })?;
+
     // Allocate the running instance
     let U: AllocatedRelaxedR1CSInstance<E> = AllocatedRelaxedR1CSInstance::alloc(
       cs.namespace(|| "Allocate U"),
@@ -183,7 +196,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     )?;
     T.check_on_curve(cs.namespace(|| "check T on curve"))?;
 
-    Ok((params, i, z_0, C_star, z_i, U, u, T))
+    Ok((params, i, z_0, C_star, z_i, C_i, U, u, T))
   }
 
   /// Synthesizes base case and returns the new relaxed `R1CSInstance`
@@ -221,6 +234,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     z_0: &[AllocatedNum<E::Base>],
     C_star: &AllocatedNum<E::Base>,
     z_i: &[AllocatedNum<E::Base>],
+    C_i: &AllocatedNum<E::Base>, 
     U: &AllocatedRelaxedR1CSInstance<E>,
     u: &AllocatedR1CSInstance<E>,
     T: &AllocatedPoint<E>,
@@ -240,6 +254,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     for e in z_i {
       ro.absorb(e);
     }
+    ro.absorb(&C_i); // Arasu: this is where C_i is added to the hash
     U.absorb_in_ro(cs.namespace(|| "absorb U"), &mut ro)?;
 
     let hash_bits = ro.squeeze(cs.namespace(|| "Input hash"), NUM_HASH_BITS)?;
@@ -274,7 +289,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     let arity = self.step_circuit.arity();
 
     // Allocate all witnesses
-    let (params, i, z_0, C_star, z_i, U, u, T) =
+    let (params, i, z_0, C_star, z_i, C_i, U, u, T) =
       self.alloc_witness(cs.namespace(|| "allocate the circuit witness"), arity)?;
 
     // Compute variable indicating if this is the base case
@@ -293,6 +308,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       &z_0,
       &C_star,
       &z_i,
+      &C_i,
       &U,
       &u,
       &T,
@@ -359,6 +375,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     for e in &z_next {
       ro.absorb(e);
     }
+    ro.absorb(&C_i); // Arasu: HERE is where C_star is added to the hash 
     Unew.absorb_in_ro(cs.namespace(|| "absorb U_new"), &mut ro)?;
     let hash_bits = ro.squeeze(cs.namespace(|| "output hash bits"), NUM_HASH_BITS)?;
     let hash = le_bits_to_num(cs.namespace(|| "convert hash to num"), &hash_bits)?;
@@ -368,7 +385,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       .inputize(cs.namespace(|| "Output unmodified hash of the other circuit"))?;
     hash.inputize(cs.namespace(|| "output new hash of this circuit"))?;
 
-    Ok(z_next)
+    Ok(z_next) // TODO: update and output C_i
   }
 }
 
@@ -433,6 +450,7 @@ mod tests {
       None,
       None,
       None,
+      None,
     );
     let circuit1: NovaAugmentedCircuit<'_, E2, TrivialCircuit<<E2 as Engine>::Base>> =
       NovaAugmentedCircuit::new(primary_params, Some(inputs1), &tc1, ro_consts1);
@@ -449,6 +467,7 @@ mod tests {
       zero2,
       vec![zero2],
       zero2, // Arasu: default C* here too
+      None,
       None,
       None,
       Some(inst1),
