@@ -51,6 +51,7 @@ pub struct NovaAugmentedCircuitInputs<E: Engine> {
   params: E::Scalar,
   i: E::Base,
   z0: Vec<E::Base>,
+  C_star: E::Base,
   zi: Option<Vec<E::Base>>,
   U: Option<RelaxedR1CSInstance<E>>,
   u: Option<R1CSInstance<E>>,
@@ -63,6 +64,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
     params: E::Scalar,
     i: E::Base,
     z0: Vec<E::Base>,
+    C_star: E::Base, 
     zi: Option<Vec<E::Base>>,
     U: Option<RelaxedR1CSInstance<E>>,
     u: Option<R1CSInstance<E>>,
@@ -72,6 +74,7 @@ impl<E: Engine> NovaAugmentedCircuitInputs<E> {
       params,
       i,
       z0,
+      C_star,
       zi,
       U,
       u,
@@ -415,6 +418,7 @@ mod tests {
       scalar_as_base::<E1>(zero1), // pass zero for testing
       zero1,
       vec![zero1],
+      zero1, // Arasu: default C* here 
       None,
       None,
       None,
@@ -434,6 +438,7 @@ mod tests {
       scalar_as_base::<E2>(zero2), // pass zero for testing
       zero2,
       vec![zero2],
+      zero2, // Arasu: default C* here too
       None,
       None,
       Some(inst1),

@@ -348,6 +348,7 @@ where
       scalar_as_base::<E1>(pp.digest()),
       E1::Scalar::ZERO,
       z0_primary.to_vec(),
+      E1::Scalar::ZERO,
       None,
       None,
       None,
@@ -375,6 +376,7 @@ where
       pp.digest(),
       E2::Scalar::ZERO,
       z0_secondary.to_vec(),
+      E2::Scalar::ZERO,
       None,
       None,
       Some(u_primary.clone()),
@@ -474,6 +476,7 @@ where
       scalar_as_base::<E1>(pp.digest()),
       E1::Scalar::from(self.i as u64),
       self.z0_primary.to_vec(),
+      E1::Scalar::ZERO, // Arasu: TODO -- change this C_star 
       Some(self.zi_primary.clone()),
       Some(self.r_U_secondary.clone()),
       Some(self.l_u_secondary.clone()),
@@ -513,6 +516,7 @@ where
       pp.digest(),
       E2::Scalar::from(self.i as u64),
       self.z0_secondary.to_vec(),
+      E2::Scalar::ZERO, // Arasu: TODO -- change this C_star 
       Some(self.zi_secondary.clone()),
       Some(self.r_U_primary.clone()),
       Some(l_u_primary),
