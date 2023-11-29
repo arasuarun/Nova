@@ -99,7 +99,7 @@ impl<E: Engine> R1CSShapeSparkRepr<E> {
   pub fn new(S: &R1CSShape<E>) -> R1CSShapeSparkRepr<E> {
     let N = {
       let total_nz = S.A.len() + S.B.len() + S.C.len();
-      max(total_nz, max(S.num_vars.0 + S.num_vars.1, S.num_cons)).next_power_of_two()
+      max(total_nz, max(S.num_vars, S.num_cons)).next_power_of_two()
     };
 
     let (mut row, mut col) = (vec![0; N], vec![N - 1; N]); // we make col lookup into the last entry of z, so we commit to zeros
@@ -975,7 +975,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
 
     let vk = VerifierKey::new(
       S.num_cons,
-      S.num_vars.0 + S.num_vars.1,
+      S.num_vars,
       S_comm.clone(),
       vk_ee,
     );
@@ -1011,7 +1011,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
     transcript.absorb(b"U", U);
 
     // compute the full satisfying assignment by concatenating W.W, U.u, and U.X
-    let z = [W.W.0.clone(), W.W.1.clone(), vec![U.u], U.X.clone()].concat();
+    let z = [W.W.clone(), vec![U.u], U.X.clone()].concat();
 
     // compute Az, Bz, Cz
     let (mut Az, mut Bz, mut Cz) = S.multiply_vec(&z)?;
@@ -1035,10 +1035,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
       Bz.resize(pk.S_repr.N, E::Scalar::ZERO);
       Cz.resize(pk.S_repr.N, E::Scalar::ZERO);
       let E = padded::<E>(&W.E, pk.S_repr.N, &E::Scalar::ZERO);
-      let W = (
-        padded::<E>(&W.W.0, pk.S_repr.N, &E::Scalar::ZERO),
-        padded::<E>(&W.W.1, pk.S_repr.N, &E::Scalar::ZERO),
-      );
+      let W = padded::<E>(&W.W, pk.S_repr.N, &E::Scalar::ZERO);
 
       (Az, Bz, Cz, W, E)
     };
@@ -1185,8 +1182,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
     // compute the remaining claims that did not come for free from the sum-check prover
     let (eval_W, eval_Cz, eval_E, eval_val_A, eval_val_B, eval_val_C, eval_row, eval_col) = {
       let e = [
-        &W.0,
-        &W.1,
+        &W,
         &Cz,
         &E,
         &pk.S_repr.val_A,
@@ -1247,8 +1243,7 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
       pk.S_comm.comm_ts_col,
     ];
     let poly_vec = [
-      &W.0,
-      &W.1,
+      &W,
       &Az,
       &Bz,
       &Cz,

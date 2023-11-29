@@ -314,7 +314,7 @@ mod tests {
     let S = {
       let res = R1CSShape::new(
         num_cons,
-        (num_vars, 0),
+        num_vars,
         num_inputs - 1,
         SparseMatrix::new(&A, rows, cols),
         SparseMatrix::new(&B, rows, cols),
@@ -348,7 +348,7 @@ mod tests {
 
         let W = {
           let res: Result<R1CSWitness<E>, NovaError> =
-            R1CSWitness::new(&S, vars.split_at(S.num_vars.0));
+            R1CSWitness::new(&S, &vars);
           assert!(res.is_ok());
           res.unwrap()
         };
@@ -442,7 +442,7 @@ mod tests {
       let res = R1CSShape::new(
         num_cons,
         // Arasu: non-trivial split
-        (0, num_vars),
+        num_vars,
         num_inputs - 1,
         SparseMatrix::new(&A, rows, cols),
         SparseMatrix::new(&B, rows, cols),
@@ -476,7 +476,7 @@ mod tests {
 
         let W = {
           let res: Result<R1CSWitness<E>, NovaError> =
-            R1CSWitness::new(&S, vars.split_at(S.num_vars.0));
+            R1CSWitness::new(&S, &vars);
           assert!(res.is_ok());
           res.unwrap()
         };
