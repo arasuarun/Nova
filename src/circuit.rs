@@ -287,8 +287,17 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     let arity = self.step_circuit.arity();
 
     // Allocate all witnesses
-    let (params, i, z_0, C_star, z_i, C_i, U, u, T) =
-      self.alloc_witness(cs.namespace(|| "allocate the circuit witness"), arity)?;
+    let (
+      params, 
+      i, 
+      z_0, 
+      C_star, 
+      z_i, 
+      C_i, 
+      U, 
+      u, 
+      T
+    ) = self.alloc_witness(cs.namespace(|| "allocate the circuit witness"), arity)?;
 
     // Compute variable indicating if this is the base case
     let zero = alloc_zero(cs.namespace(|| "zero"));
@@ -363,15 +372,18 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
     }
 
     // Arasu: compute C_{next} as just C_i + 1 for now (TODO)
-    let C_next = AllocatedNum::alloc(cs.namespace(|| "increment C_i"), || {
-      Ok(*C_i.get_value().get()? + E::Base::from(109u64))
-    })?;
+    // let C_next = AllocatedNum::alloc(cs.namespace(|| "increment C_i"), || {
+    //   Ok(*C_i.get_value().get()? + E::Base::from(109u64))
+    // })?;
 
-    let mut ro_ci = E::ROCircuit::new(
-      self.ro_consts.clone(),
-      NUM_FE_WITHOUT_IO_FOR_CRHF + 2 * arity,
-    );
+    let mut ro_ci = E::ROCircuit::new(self.ro_consts.clone(), 3);
+
     ro_ci.absorb(&C_i);
+    ro_ci.absorb(&u.W.0.x);
+    ro_ci.absorb(&u.W.0.y);
+
+    let C_next_hash_bits = ro_ci.squeeze(cs.namespace(|| "output Ci hash bits"), NUM_HASH_BITS)?;
+    let C_next= le_bits_to_num(cs.namespace(|| "convert Ci hash to num"), &C_next_hash_bits)?;
 
     // Compute the new hash H(params, Unew, i+1, z0, z_{i+1})
     let mut ro = E::ROCircuit::new(self.ro_consts, NUM_FE_WITHOUT_IO_FOR_CRHF + 2 * arity);
