@@ -212,12 +212,14 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
             || {
               rayon::join(
                 || {
-                  let mut B_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; S.num_vars.0 + S.num_vars.1];
+                  let mut B_evals: Vec<E::Scalar> =
+                    vec![E::Scalar::ZERO; S.num_vars.0 + S.num_vars.1];
                   inner(&S.B, &mut B_evals);
                   B_evals
                 },
                 || {
-                  let mut C_evals: Vec<E::Scalar> = vec![E::Scalar::ZERO; S.num_vars.0 + S.num_vars.1];
+                  let mut C_evals: Vec<E::Scalar> =
+                    vec![E::Scalar::ZERO; S.num_vars.0 + S.num_vars.1];
                   inner(&S.C, &mut C_evals);
                   C_evals
                 },
@@ -438,8 +440,11 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
             .map(|i| (i + 1, U.X[i]))
             .collect::<Vec<(usize, E::Scalar)>>(),
         );
-        SparsePolynomial::new(usize::try_from((vk.S.num_vars.0 + vk.S.num_vars.1).ilog2()).unwrap(), poly_X)
-          .evaluate(&r_y[1..])
+        SparsePolynomial::new(
+          usize::try_from((vk.S.num_vars.0 + vk.S.num_vars.1).ilog2()).unwrap(),
+          poly_X,
+        )
+        .evaluate(&r_y[1..])
       };
       // Arasu: not sure if this is correct
       (E::Scalar::ONE - r_y[0]) * (self.eval_W.0 + self.eval_W.1) + r_y[0] * eval_X

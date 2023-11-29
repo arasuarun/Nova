@@ -37,10 +37,8 @@ impl<E: Engine> NovaWitness<E> for SatisfyingAssignment<E> {
     ck: &CommitmentKey<E>,
   ) -> Result<(R1CSInstance<E>, R1CSWitness<E>), NovaError> {
     // let W = R1CSWitness::<E>::new(shape, self.aux_assignment())?;
-    // Arasu: I think this is how it should be 
-    let W = R1CSWitness::<E>::new(shape, 
-      self.aux_assignment().split_at(shape.num_vars.0)
-    )?;
+    // Arasu: I think this is how it should be
+    let W = R1CSWitness::<E>::new(shape, self.aux_assignment().split_at(shape.num_vars.0))?;
     let X = &self.input_assignment()[1..];
 
     let comm_W = W.commit(ck);

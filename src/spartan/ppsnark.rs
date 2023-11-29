@@ -973,7 +973,12 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
     let S_repr = R1CSShapeSparkRepr::new(&S);
     let S_comm = S_repr.commit(ck);
 
-    let vk = VerifierKey::new(S.num_cons, S.num_vars.0 + S.num_vars.1, S_comm.clone(), vk_ee);
+    let vk = VerifierKey::new(
+      S.num_cons,
+      S.num_vars.0 + S.num_vars.1,
+      S_comm.clone(),
+      vk_ee,
+    );
 
     let pk = ProverKey {
       pk_ee,
@@ -1030,7 +1035,10 @@ impl<E: Engine, EE: EvaluationEngineTrait<E>> RelaxedR1CSSNARKTrait<E> for Relax
       Bz.resize(pk.S_repr.N, E::Scalar::ZERO);
       Cz.resize(pk.S_repr.N, E::Scalar::ZERO);
       let E = padded::<E>(&W.E, pk.S_repr.N, &E::Scalar::ZERO);
-      let W = (padded::<E>(&W.W.0, pk.S_repr.N, &E::Scalar::ZERO), padded::<E>(&W.W.1, pk.S_repr.N, &E::Scalar::ZERO));
+      let W = (
+        padded::<E>(&W.W.0, pk.S_repr.N, &E::Scalar::ZERO),
+        padded::<E>(&W.W.1, pk.S_repr.N, &E::Scalar::ZERO),
+      );
 
       (Az, Bz, Cz, W, E)
     };

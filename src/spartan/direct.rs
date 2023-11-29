@@ -96,7 +96,7 @@ where
   C: StepCircuit<E::Scalar>,
 {
   comm_W: (Commitment<E>, Commitment<E>), // commitment to the witness
-  snark: S,              // snark proving the witness is satisfying
+  snark: S,                               // snark proving the witness is satisfying
   _p: PhantomData<C>,
 }
 

@@ -35,21 +35,25 @@ impl<E: Engine> AllocatedR1CSInstance<E> {
   ) -> Result<Self, SynthesisError> {
     let (W0, W1) = (
       AllocatedPoint::alloc(
-          cs.namespace(|| "allocate W0"),
-          u.map(|u| u.comm_W.0.to_coordinates()),
+        cs.namespace(|| "allocate W0"),
+        u.map(|u| u.comm_W.0.to_coordinates()),
       )?,
       AllocatedPoint::alloc(
-          cs.namespace(|| "allocate W1"),
-          u.map(|u| u.comm_W.1.to_coordinates()),
+        cs.namespace(|| "allocate W1"),
+        u.map(|u| u.comm_W.1.to_coordinates()),
       )?,
-  );
-  W0.check_on_curve(cs.namespace(|| "check W0 on curve"))?;
-  W1.check_on_curve(cs.namespace(|| "check W1 on curve"))?;
+    );
+    W0.check_on_curve(cs.namespace(|| "check W0 on curve"))?;
+    W1.check_on_curve(cs.namespace(|| "check W1 on curve"))?;
 
     let X0 = alloc_scalar_as_base::<E, _>(cs.namespace(|| "allocate X[0]"), u.map(|u| u.X[0]))?;
     let X1 = alloc_scalar_as_base::<E, _>(cs.namespace(|| "allocate X[1]"), u.map(|u| u.X[1]))?;
 
-    Ok(AllocatedR1CSInstance { W: (W0, W1), X0, X1 })
+    Ok(AllocatedR1CSInstance {
+      W: (W0, W1),
+      X0,
+      X1,
+    })
   }
 
   /// Absorb the provided instance in the RO
@@ -87,12 +91,12 @@ impl<E: Engine> AllocatedRelaxedR1CSInstance<E> {
     // came from a prior iteration of Nova.
     let (W0, W1) = (
       AllocatedPoint::alloc(
-          cs.namespace(|| "allocate W0"),
-          inst.map(|inst| inst.comm_W.0.to_coordinates()),
+        cs.namespace(|| "allocate W0"),
+        inst.map(|inst| inst.comm_W.0.to_coordinates()),
       )?,
       AllocatedPoint::alloc(
-          cs.namespace(|| "allocate W1"),
-          inst.map(|inst| inst.comm_W.1.to_coordinates()),
+        cs.namespace(|| "allocate W1"),
+        inst.map(|inst| inst.comm_W.1.to_coordinates()),
       )?,
     );
 
@@ -120,7 +124,13 @@ impl<E: Engine> AllocatedRelaxedR1CSInstance<E> {
       n_limbs,
     )?;
 
-    Ok(AllocatedRelaxedR1CSInstance { W: (W0, W1), E, u, X0, X1 })
+    Ok(AllocatedRelaxedR1CSInstance {
+      W: (W0, W1),
+      E,
+      u,
+      X0,
+      X1,
+    })
   }
 
   /// Allocates the hardcoded default `RelaxedR1CSInstance` in the circuit.
@@ -153,7 +163,13 @@ impl<E: Engine> AllocatedRelaxedR1CSInstance<E> {
       n_limbs,
     )?;
 
-    Ok(AllocatedRelaxedR1CSInstance { W: (W0, W1), E, u, X0, X1 })
+    Ok(AllocatedRelaxedR1CSInstance {
+      W: (W0, W1),
+      E,
+      u,
+      X0,
+      X1,
+    })
   }
 
   /// Allocates the R1CS Instance as a `RelaxedR1CSInstance` in the circuit.
@@ -271,8 +287,8 @@ impl<E: Engine> AllocatedRelaxedR1CSInstance<E> {
       u.W.1.scalar_mul(cs.namespace(|| "r * u.W1"), &r_bits)?,
     );
     let (W0_fold, W1_fold) = (
-        self.W.0.add(cs.namespace(|| "self.W0 + r * u.W0"), &rW0)?,
-        self.W.1.add(cs.namespace(|| "self.W1 + r * u.W1"), &rW1)?,
+      self.W.0.add(cs.namespace(|| "self.W0 + r * u.W0"), &rW0)?,
+      self.W.1.add(cs.namespace(|| "self.W1 + r * u.W1"), &rW1)?,
     );
 
     // E_fold = self.E + r * T
@@ -395,6 +411,12 @@ impl<E: Engine> AllocatedRelaxedR1CSInstance<E> {
       condition,
     )?;
 
-    Ok(AllocatedRelaxedR1CSInstance { W: (W0, W1), E, u, X0, X1 })
+    Ok(AllocatedRelaxedR1CSInstance {
+      W: (W0, W1),
+      E,
+      u,
+      X0,
+      X1,
+    })
   }
 }

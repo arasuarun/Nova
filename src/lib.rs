@@ -170,7 +170,6 @@ where
     let _ = circuit_primary.synthesize(&mut cs);
     let (r1cs_shape_primary, ck_primary) = cs.r1cs_shape(ck_hint1);
 
-
     // Initialize ck for the secondary
     let circuit_secondary: NovaAugmentedCircuit<'_, E1, C2> = NovaAugmentedCircuit::new(
       &augmented_circuit_params_secondary,
@@ -200,7 +199,7 @@ where
     }
   }
 
-  /// Same as above but for a split witness 
+  /// Same as above but for a split witness
   pub fn setup_with_split(
     c_primary: &C1,
     c_secondary: &C2,
@@ -236,12 +235,15 @@ where
 
     let r1cs_shape_primary = R1CSShape {
       num_cons: r1cs_shape_primary_unsplit.num_cons,
-      num_vars: (split_length, r1cs_shape_primary_unsplit.num_vars.1 - split_length),
+      num_vars: (
+        split_length,
+        r1cs_shape_primary_unsplit.num_vars.1 - split_length,
+      ),
       num_io: r1cs_shape_primary_unsplit.num_io,
       A: r1cs_shape_primary_unsplit.A,
       B: r1cs_shape_primary_unsplit.B,
       C: r1cs_shape_primary_unsplit.C,
-      digest: r1cs_shape_primary_unsplit.digest, 
+      digest: r1cs_shape_primary_unsplit.digest,
     };
 
     // Initialize ck for the secondary
@@ -430,7 +432,7 @@ where
       .collect::<Result<Vec<<E1 as Engine>::Scalar>, NovaError>>()
       .expect("Nova error synthesis");
 
-    // In the base case, C_i is not changed 
+    // In the base case, C_i is not changed
     let Ci_primary = Ci_primary
       .get_value()
       .ok_or(NovaError::SynthesisError)
@@ -442,7 +444,7 @@ where
       .collect::<Result<Vec<<E2 as Engine>::Scalar>, NovaError>>()
       .expect("Nova error synthesis");
 
-    // In the base case, C_i is not changed 
+    // In the base case, C_i is not changed
     let Ci_secondary = Ci_secondary
       .get_value()
       .ok_or(NovaError::SynthesisError)
@@ -460,7 +462,7 @@ where
       l_u_secondary,
       i: 0,
       zi_primary,
-      Ci_primary, 
+      Ci_primary,
       zi_secondary,
       Ci_secondary,
       _p: Default::default(),
@@ -514,7 +516,7 @@ where
       pp.ro_consts_circuit_primary.clone(),
     );
 
-    // TODO: check where exactly Ci_primary was being updated 
+    // TODO: check where exactly Ci_primary was being updated
 
     let (zi_primary, Ci_primary) = circuit_primary
       .synthesize(&mut cs_primary)
@@ -571,18 +573,14 @@ where
       .map(|v| v.get_value().ok_or(NovaError::SynthesisError))
       .collect::<Result<Vec<<E1 as Engine>::Scalar>, NovaError>>()?;
 
-    self.Ci_primary = Ci_primary
-      .get_value()
-      .ok_or(NovaError::SynthesisError)?;
+    self.Ci_primary = Ci_primary.get_value().ok_or(NovaError::SynthesisError)?;
 
     self.zi_secondary = zi_secondary
       .iter()
       .map(|v| v.get_value().ok_or(NovaError::SynthesisError))
       .collect::<Result<Vec<<E2 as Engine>::Scalar>, NovaError>>()?;
 
-    self.Ci_secondary = Ci_secondary
-      .get_value()
-      .ok_or(NovaError::SynthesisError)?;
+    self.Ci_secondary = Ci_secondary.get_value().ok_or(NovaError::SynthesisError)?;
 
     self.l_u_secondary = l_u_secondary;
     self.l_w_secondary = l_w_secondary;
@@ -656,11 +654,11 @@ where
       for e in z0_secondary {
         hasher2.absorb(*e);
       }
-      hasher2.absorb(E2::Scalar::ZERO); // Arasu: C_star is always 0 in secondary 
+      hasher2.absorb(E2::Scalar::ZERO); // Arasu: C_star is always 0 in secondary
       for e in &self.zi_secondary {
         hasher2.absorb(*e);
       }
-      hasher2.absorb(self.Ci_secondary); 
+      hasher2.absorb(self.Ci_secondary);
       self.r_U_primary.absorb_in_ro(&mut hasher2);
 
       (
@@ -1424,7 +1422,7 @@ mod tests {
       &pp,
       num_steps,
       &[<E1 as Engine>::Scalar::ONE],
-      <E1 as Engine>::Scalar::ZERO, 
+      <E1 as Engine>::Scalar::ZERO,
       &[<E2 as Engine>::Scalar::ZERO],
     );
     assert!(res.is_ok());
@@ -1589,7 +1587,13 @@ mod tests {
     }
 
     // verify the recursive SNARK
-    let res = recursive_snark.verify(&pp, num_steps, &z0_primary, <E1 as Engine>::Scalar::ZERO, &z0_secondary);
+    let res = recursive_snark.verify(
+      &pp,
+      num_steps,
+      &z0_primary,
+      <E1 as Engine>::Scalar::ZERO,
+      &z0_secondary,
+    );
     assert!(res.is_ok());
 
     // produce the prover and verifier keys for compressed snark
@@ -1602,7 +1606,13 @@ mod tests {
     let compressed_snark = res.unwrap();
 
     // verify the compressed SNARK
-    let res = compressed_snark.verify(&vk, num_steps, &z0_primary, <E1 as Engine>::Scalar::ZERO, &z0_secondary);
+    let res = compressed_snark.verify(
+      &vk,
+      num_steps,
+      &z0_primary,
+      <E1 as Engine>::Scalar::ZERO,
+      &z0_secondary,
+    );
     assert!(res.is_ok());
   }
 

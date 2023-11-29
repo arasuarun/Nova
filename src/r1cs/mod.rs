@@ -160,7 +160,8 @@ impl<E: Engine> R1CSShape<E> {
   #[inline]
   pub(crate) fn is_regular_shape(&self) -> bool {
     let cons_valid = self.num_cons.next_power_of_two() == self.num_cons;
-    let vars_valid = (self.num_vars.0 + self.num_vars.1).next_power_of_two() == (self.num_vars.0 + self.num_vars.1);
+    let vars_valid = (self.num_vars.0 + self.num_vars.1).next_power_of_two()
+      == (self.num_vars.0 + self.num_vars.1);
     let io_valid = self.num_io.next_power_of_two() == self.num_io;
     let io_lt_vars = self.num_io < self.num_vars.0 + self.num_vars.1;
     cons_valid && vars_valid && io_valid && io_lt_vars
@@ -477,14 +478,15 @@ impl<E: Engine> RelaxedR1CSWitness<E> {
       return Err(NovaError::InvalidWitnessLength);
     }
 
-
-    let W0 = W1.0
+    let W0 = W1
+      .0
       .par_iter()
       .zip(&W2.0)
       .map(|(a, b)| (*a + *r * *b))
       .collect::<Vec<E::Scalar>>();
 
-    let W1 = W1.1
+    let W1 = W1
+      .1
       .par_iter()
       .zip(&W2.1)
       .map(|(a, b)| (*a + *r * *b))
@@ -553,7 +555,7 @@ impl<E: Engine> RelaxedR1CSInstance<E> {
     X: &[E::Scalar],
   ) -> RelaxedR1CSInstance<E> {
     RelaxedR1CSInstance {
-      comm_W: *comm_W, 
+      comm_W: *comm_W,
       comm_E: Commitment::<E>::default(),
       u: E::Scalar::ONE,
       X: X.to_vec(),

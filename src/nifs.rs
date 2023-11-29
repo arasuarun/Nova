@@ -236,7 +236,6 @@ mod tests {
     r_W = W;
     r_U = U;
 
-
     // produce a step SNARK with (W2, U2) as the second incoming witness-instance pair
     let res = NIFS::prove(ck, ro_consts, pp_digest, shape, &r_U, &r_W, U2, W2);
     assert!(res.is_ok());
@@ -315,7 +314,7 @@ mod tests {
     let S = {
       let res = R1CSShape::new(
         num_cons,
-        (num_vars, 0), 
+        (num_vars, 0),
         num_inputs - 1,
         SparseMatrix::new(&A, rows, cols),
         SparseMatrix::new(&B, rows, cols),
@@ -347,9 +346,9 @@ mod tests {
           (i1, W, X)
         };
 
-
         let W = {
-          let res: Result<R1CSWitness<E>, NovaError> = R1CSWitness::new(&S, vars.split_at(S.num_vars.0));
+          let res: Result<R1CSWitness<E>, NovaError> =
+            R1CSWitness::new(&S, vars.split_at(S.num_vars.0));
           assert!(res.is_ok());
           res.unwrap()
         };
@@ -383,7 +382,6 @@ mod tests {
       &W2,
     );
   }
-
 
   fn test_tiny_r1cs_with_non_trivial_split<E: Engine>() {
     let one = <E::Scalar as Field>::ONE;
@@ -444,7 +442,7 @@ mod tests {
       let res = R1CSShape::new(
         num_cons,
         // Arasu: non-trivial split
-        (0, num_vars), 
+        (0, num_vars),
         num_inputs - 1,
         SparseMatrix::new(&A, rows, cols),
         SparseMatrix::new(&B, rows, cols),
@@ -476,9 +474,9 @@ mod tests {
           (i1, W, X)
         };
 
-
         let W = {
-          let res: Result<R1CSWitness<E>, NovaError> = R1CSWitness::new(&S, vars.split_at(S.num_vars.0));
+          let res: Result<R1CSWitness<E>, NovaError> =
+            R1CSWitness::new(&S, vars.split_at(S.num_vars.0));
           assert!(res.is_ok());
           res.unwrap()
         };

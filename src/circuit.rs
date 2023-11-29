@@ -367,6 +367,12 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       Ok(*C_i.get_value().get()? + E::Base::from(109u64))
     })?;
 
+    let mut ro_ci = E::ROCircuit::new(
+      self.ro_consts.clone(),
+      NUM_FE_WITHOUT_IO_FOR_CRHF + 2 * arity,
+    );
+    ro_ci.absorb(&C_i);
+
     // Compute the new hash H(params, Unew, i+1, z0, z_{i+1})
     let mut ro = E::ROCircuit::new(self.ro_consts, NUM_FE_WITHOUT_IO_FOR_CRHF + 2 * arity);
     ro.absorb(&params);
@@ -388,7 +394,7 @@ impl<'a, E: Engine, SC: StepCircuit<E::Base>> NovaAugmentedCircuit<'a, E, SC> {
       .inputize(cs.namespace(|| "Output unmodified hash of the other circuit"))?;
     hash.inputize(cs.namespace(|| "output new hash of this circuit"))?;
 
-    Ok((z_next, C_next)) 
+    Ok((z_next, C_next))
   }
 }
 
