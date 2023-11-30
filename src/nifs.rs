@@ -199,11 +199,11 @@ mod tests {
 
   #[test]
   fn test_tiny_r1cs_bellpepper() {
-    // test_tiny_r1cs_bellpepper_with::<PallasEngine>();
+    test_tiny_r1cs_bellpepper_with::<PallasEngine>();
     test_tiny_r1cs_bellpepper_with::<Bn256Engine>();
-    // test_tiny_r1cs_bellpepper_with::<Secp256k1Engine>();
+    test_tiny_r1cs_bellpepper_with::<Secp256k1Engine>();
 
-    test_tiny_r1cs_with_non_trivial_split::<Bn256Engine>();
+    test_tiny_r1cs_with_non_trivial_split::<Bn256Engine>(1);
   }
 
   fn execute_sequence<E: Engine>(
@@ -383,7 +383,7 @@ mod tests {
     );
   }
 
-  fn test_tiny_r1cs_with_non_trivial_split<E: Engine>() {
+  fn test_tiny_r1cs_with_non_trivial_split<E: Engine>(first_split_length: usize) {
     let one = <E::Scalar as Field>::ONE;
     let (num_cons, num_vars, num_io, A, B, C) = {
       let num_cons = 4;
@@ -442,7 +442,7 @@ mod tests {
       let res = R1CSShape::new(
         num_cons,
         // Arasu: non-trivial split
-        (0, num_vars),
+        (first_split_length, num_vars - first_split_length),
         num_inputs - 1,
         SparseMatrix::new(&A, rows, cols),
         SparseMatrix::new(&B, rows, cols),

@@ -2,7 +2,7 @@
 //! iterations of the `MinRoot` function, thereby realizing a Nova-based verifiable delay function (VDF).
 //! We execute a configurable number of iterations of the `MinRoot` function per step of Nova's recursion.
 use bellpepper_core::{num::AllocatedNum, ConstraintSystem, SynthesisError};
-use ff::PrimeField;
+use ff::{Field, PrimeField};
 use flate2::{write::ZlibEncoder, Compression};
 use nova_snark::{
   provider::{PallasEngine, VestaEngine},
@@ -210,6 +210,8 @@ fn main() {
 
     let z0_secondary = vec![<E2 as Engine>::Scalar::zero()];
 
+    let C_star = <E1 as Engine>::Scalar::ZERO;
+
     type C1 = MinRootCircuit<<E1 as Engine>::Scalar>;
     type C2 = TrivialCircuit<<E2 as Engine>::Scalar>;
     // produce a recursive SNARK
@@ -220,6 +222,7 @@ fn main() {
         &minroot_circuits[0],
         &circuit_secondary,
         &z0_primary,
+        C_star,
         &z0_secondary,
       )
       .unwrap();
@@ -239,7 +242,7 @@ fn main() {
     // verify the recursive SNARK
     println!("Verifying a RecursiveSNARK...");
     let start = Instant::now();
-    let res = recursive_snark.verify(&pp, num_steps, &z0_primary, &z0_secondary);
+    let res = recursive_snark.verify(&pp, num_steps, &z0_primary, C_star, &z0_secondary);
     println!(
       "RecursiveSNARK::verify: {:?}, took {:?}",
       res.is_ok(),
@@ -277,7 +280,7 @@ fn main() {
     // verify the compressed SNARK
     println!("Verifying a CompressedSNARK...");
     let start = Instant::now();
-    let res = compressed_snark.verify(&vk, num_steps, &z0_primary, &z0_secondary);
+    let res = compressed_snark.verify(&vk, num_steps, &z0_primary, C_star, &z0_secondary);
     println!(
       "CompressedSNARK::verify: {:?}, took {:?}",
       res.is_ok(),

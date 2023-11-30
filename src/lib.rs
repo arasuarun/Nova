@@ -501,7 +501,7 @@ where
       scalar_as_base::<E1>(pp.digest()),
       E1::Scalar::from(self.i as u64),
       self.z0_primary.to_vec(),
-      self.C_star.clone(), // Arasu: set C_star primary
+      self.C_star.clone(), 
       Some(self.zi_primary.clone()),
       Some(self.Ci_primary.clone()),
       Some(self.r_U_secondary.clone()),
@@ -547,7 +547,7 @@ where
       self.z0_secondary.to_vec(),
       E2::Scalar::ZERO, // Arasu: C_star secondary is always 0
       Some(self.zi_secondary.clone()),
-      Some(self.Ci_secondary.clone()), // Arasu: C_i is also set to 0
+      Some(self.Ci_secondary.clone()),
       Some(self.r_U_primary.clone()),
       Some(l_u_primary),
       Some(Commitment::<E1>::decompress(&nifs_primary.comm_T)?),
