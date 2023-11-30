@@ -61,9 +61,10 @@ impl<E: Engine> AllocatedR1CSInstance<E> {
     ro.absorb(&self.W.0.x);
     ro.absorb(&self.W.0.y);
     ro.absorb(&self.W.0.is_infinity);
-    ro.absorb(&self.W.1.x);
-    ro.absorb(&self.W.1.x);
-    ro.absorb(&self.W.1.is_infinity);
+    // Arasu: RO ABSORB issue 
+    // ro.absorb(&self.W.1.x);
+    // ro.absorb(&self.W.1.x);
+    // ro.absorb(&self.W.1.is_infinity);
     ro.absorb(&self.X0);
     ro.absorb(&self.X1);
   }
@@ -216,9 +217,10 @@ impl<E: Engine> AllocatedRelaxedR1CSInstance<E> {
     ro.absorb(&self.W.0.x);
     ro.absorb(&self.W.0.y);
     ro.absorb(&self.W.0.is_infinity);
-    ro.absorb(&self.W.1.x);
-    ro.absorb(&self.W.1.y);
-    ro.absorb(&self.W.1.is_infinity);
+    // Arasu: RO ABSORB ISSUE 
+    // ro.absorb(&self.W.1.x);
+    // ro.absorb(&self.W.1.y);
+    // ro.absorb(&self.W.1.is_infinity);
     ro.absorb(&self.E.x);
     ro.absorb(&self.E.y);
     ro.absorb(&self.E.is_infinity);

@@ -426,7 +426,8 @@ impl<E: Engine> R1CSInstance<E> {
 impl<E: Engine> AbsorbInROTrait<E> for R1CSInstance<E> {
   fn absorb_in_ro(&self, ro: &mut E::RO) {
     self.comm_W.0.absorb_in_ro(ro);
-    self.comm_W.1.absorb_in_ro(ro);
+    // Arasu: RO ABSORB issue 
+    // self.comm_W.1.absorb_in_ro(ro);
     for x in &self.X {
       ro.absorb(scalar_as_base::<E>(*x));
     }
@@ -611,7 +612,8 @@ impl<E: Engine> TranscriptReprTrait<E::GE> for RelaxedR1CSInstance<E> {
 impl<E: Engine> AbsorbInROTrait<E> for RelaxedR1CSInstance<E> {
   fn absorb_in_ro(&self, ro: &mut E::RO) {
     self.comm_W.0.absorb_in_ro(ro);
-    self.comm_W.1.absorb_in_ro(ro);
+    // Arasu: RO ABSORB issue
+    // self.comm_W.1.absorb_in_ro(ro);
     self.comm_E.absorb_in_ro(ro);
     ro.absorb(scalar_as_base::<E>(self.u));
 
